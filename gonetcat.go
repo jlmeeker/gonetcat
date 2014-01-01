@@ -8,6 +8,9 @@ import (
 	"log"
 	"math"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"strings"
 	"sync"
 	"time"
@@ -72,7 +75,7 @@ func processResult(bytes int64, seconds float64) {
 
 
 // Run as a server
-func serverHandler(showOutput bool) {
+func serverHandler(proto string, showOutput bool) {
 	// Listen
 	l, err := net.Listen(proto, addr+":"+port)
 
@@ -116,7 +119,7 @@ func serverHandler(showOutput bool) {
 
 
 // Run as a client
-func clientHandler(showOutput bool) {
+func clientHandler(proto string, showOutput bool) {
 	defer wg.Done()
 
 	zero := make([]byte, blocksz, blocksz)
@@ -124,8 +127,18 @@ func clientHandler(showOutput bool) {
 	var bytesXferred int64
 	var runsBytesXferred int64
 	var runsSeconds float64
+	var loopForever bool
+
+	if runs == 0 {
+		loopForever = true
+		runs = 1
+	}
 
 	for runNumber := 0; runNumber < runs; runNumber++ {
+		if stopExecution {
+			break
+		}
+
 		bytesXferred = 0
 		d, err := net.Dial(proto, addr+":"+port)
 		if err != nil {
@@ -134,6 +147,9 @@ func clientHandler(showOutput bool) {
 		
 		startTime := time.Now()
 		for i = 0; i < blockcount; i++ {
+			if stopExecution {
+				break
+			}
 			newBytes,_ := d.Write(zero)
 			bytesXferred += int64(newBytes)
 		}
@@ -150,6 +166,10 @@ func clientHandler(showOutput bool) {
 		// Keep track of stats over all runs
 		runsBytesXferred += bytesXferred
 		runsSeconds += seconds
+
+		if loopForever {
+			runs += 1
+		}
 	}
 
 	if runs > 1 && showOutput {
@@ -162,9 +182,10 @@ func clientHandler(showOutput bool) {
 
 
 // Global variables
+var stopExecution bool
 var addr string
 var port string
-var proto string
+var udp bool
 var repeat bool
 var server bool
 var client bool
@@ -184,12 +205,12 @@ func init() {
 		addrDescr = "Interface address (or name) to listen on"
 		defaultPort = "2000"
 		portDescr = "Port to listen on"
-		defaultProto = "tcp"
-		protoDescr = "Protocol to listen on: tcp, udp"
+		defaultUdp = false
+		udpDescr = "Use UDP instead of TCP"
 		defaultRepeat = false
 		repeatDescr = "Enable echo of received data (reply to sender with received data)"
-		defaultServer = false
-		serverDescr = "Listen for incoming connections"
+		defaultListen = false
+		listenDescr = "Listen for incoming connections"
 		defaultClient = false
 		clientDescr = "Send to remote host"
 		defaultBlockSize = 1000000
@@ -203,41 +224,61 @@ func init() {
 		defaultRuns = 1
 		runsDescr = "How many consecutive times to run the client transfer test (0 is indefinitely)"
 	)
-	flag.StringVar(&addr, "host", defaultAddress, addrDescr)
-	flag.StringVar(&port, "port", defaultPort, portDescr)
-	flag.StringVar(&proto, "proto", defaultProto, protoDescr)
+	flag.StringVar(&addr, "s", defaultAddress, addrDescr)
+	flag.StringVar(&port, "p", defaultPort, portDescr)
+	flag.BoolVar(&udp, "U", defaultUdp, udpDescr)
 	flag.BoolVar(&repeat, "repeat", defaultRepeat, repeatDescr)
-	flag.BoolVar(&server, "server", defaultServer, serverDescr)
+	flag.BoolVar(&server, "l", defaultListen, listenDescr)
 	flag.BoolVar(&client, "client", defaultClient, clientDescr)
-	flag.Int64Var(&blocksz, "bsize", defaultBlockSize, blockSizeDescr)
-	flag.Int64Var(&blockcount, "bcount", defaultBlockCount, blockCountDescr)
+	flag.Int64Var(&blocksz, "bs", defaultBlockSize, blockSizeDescr)
+	flag.Int64Var(&blockcount, "bc", defaultBlockCount, blockCountDescr)
 	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
-	flag.BoolVar(&usebytes, "bytes", defaultBytes, bytesDescr)
-	flag.IntVar(&runs, "runs", defaultRuns, runsDescr)
+	flag.BoolVar(&usebytes, "B", defaultBytes, bytesDescr)
+	flag.IntVar(&runs, "c", defaultRuns, runsDescr)
 
 	// Validate flags from CLI
 	flag.Parse()
+
+	// Let things run
+	stopExecution = false
 }
 
 var wg sync.WaitGroup
 
 func main() {
+	proto := "tcp"
+	if udp {
+		proto = "udp"
+	}
+
+	// Catch Ctrl-C so we can exit cleanly
+	c := make(chan os.Signal, 1)                                       
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)                                     
+	go func() {                                                        
+		for _ = range c {                                             
+			stopExecution = true
+			if client == false {
+				os.Exit(1)
+			}
+		}                                                            
+	}()
 	
+	// Run server and/or client
 	if server && client {
-		go serverHandler(false) // don't log since we're waiting only on the client, so it will log
+		go serverHandler(proto, false) // don't log since we're waiting only on the client, so it will log
 		time.Sleep(2*time.Second) // Wait for server to listen before we start client tests
 
 		wg.Add(1)  // Only wait for client to complete, server will be killed when client runs are complete
-		go clientHandler(true)
+		go clientHandler(proto, true)
 	} else if server {
-		serverHandler(true) // do not background, run indefinitely
+		serverHandler(proto, true) // do not background, run indefinitely
 	} else if client {
 		wg.Add(1)
-		go clientHandler(true)  // It doesn't matter if we background or not here, so why not?
+		go clientHandler(proto, true)  // It doesn't matter if we background or not here, so why not?
 	} 
 
 	if server == false && client == false {
-		fmt.Println("You must specify either -server or -client.")
+		fmt.Println("You must specify at least one of -l, -client.")
 		return
 	}
 
