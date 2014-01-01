@@ -9,7 +9,7 @@ go build gonetcat.go
 ```
 
 Executing:
-```
+```Shell
 # Server
 gonetcat -server
 
@@ -18,8 +18,8 @@ gonetcat -client
 ```
 
 Other options:
-```
-gonetcat -h
+```Shell
+user@hostname $ gonetcat -h
 Usage of gonetcat:
   -bcount=1000: Number of blocks to send (default is 1 thousand)
   -bsize=1000000: Block size (in bytes) for client send (default is 1 megabyte)
@@ -35,7 +35,7 @@ Usage of gonetcat:
 ```
 
 Sample output:
-```
+```Shell
 # run as a server and client on the same computer (testing a combination of cpu/memory speeds)
 user@hostname $ gonetcat -server -client -bsize 100000000 -bcount 100
 2013/12/31 20:26:20 23057959355.344212 Bps (80000000000 bits sent in 3.469518 seconds)
