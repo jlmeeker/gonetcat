@@ -30,6 +30,7 @@ Usage of gonetcat:
   -port="2000": Port to listen on
   -proto="tcp": Protocol to listen on: tcp, udp
   -repeat=false: Enable echo of received data (reply to sender with received data)
+  -runs=1: How many consecutive times to run the client transfer test (0 is indefinitely)
   -server=false: Listen for incoming connections
   -unit="bps": Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)
 ```
