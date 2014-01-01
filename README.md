@@ -42,4 +42,11 @@ user@hostname $ gonetcat -server -client -bsize 100000000 -bcount 100
 
 user@hostname $ gonetcat -server -client -bsize 100000000 -bcount 100 -unit mbps
 2013/12/31 20:26:53 23507.409472 Mbps (80000000000 bits sent in 3.403182 seconds)
+
+user@hostname $ gonetcat -client -bsize 10000 -bcount 100000 -bytes -unit gbps -runs 5
+2013/12/31 21:25:44 1.513957 GBps (1000000000 bytes sent in 0.660521 seconds)
+2013/12/31 21:25:44 1.522700 GBps (1000000000 bytes sent in 0.656728 seconds)
+2013/12/31 21:25:45 1.562462 GBps (1000000000 bytes sent in 0.640015 seconds)
+2013/12/31 21:25:45 1.533771 GBps (1000000000 bytes sent in 0.651988 seconds)
+2013/12/31 21:25:46 1.550016 GBps (1000000000 bytes sent in 0.645155 seconds)
 ```

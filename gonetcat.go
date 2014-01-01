@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,10 +18,13 @@ type xferResult struct {
 	Seconds float64
 }
 
+// Get our result bytes into bits
 func (r *xferResult) Bits() float64 {
 	return r.Bytes * 8
 }
 
+
+// Build units array (used in formatValue for division operations)
 func prepUnits() map[string]float64 {
     var units = make(map[string]float64)
 
@@ -34,12 +38,15 @@ func prepUnits() map[string]float64 {
 }
 
 
+// Get our rate in the specified unit
 func formatValue(rawval float64, format string) float64 {
     units := prepUnits()
     return rawval / units[strings.ToLower(format)]
 }
 
-func processResult(bytes int64, seconds float64) {
+
+// Calculate stats and (optionally) print them to the screen
+func processResult(bytes int64, seconds float64, display bool) {
 	var result xferResult
 	var rate float64
 	var bitbyte string
@@ -59,11 +66,15 @@ func processResult(bytes int64, seconds float64) {
 		totalxferBb = int64(result.Bits())
 	}
 
-	unit = strings.Title(unit)
-	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
+	if display {
+		unit = strings.Title(unit)
+		log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
+	}
 }
 
-func serverHandler() {
+
+// Run as a server
+func serverHandler(showOutput bool) {
 	// Listen
 	l, err := net.Listen(proto, addr+":"+port)
 
@@ -96,32 +107,40 @@ func serverHandler() {
 
 			// Shut down the connection
 			c.Close()
-			processResult(bytesXferred, endTime.Sub(startTime).Seconds())
+			processResult(bytesXferred, endTime.Sub(startTime).Seconds(), showOutput)
 		}(conn)
 	}
 }
 
-// Generate and send data
-func clientHandler() {
+
+// Run as a client
+func clientHandler(showOutput bool) {
+	defer wg.Done()
+
 	zero := make([]byte, blocksz, blocksz)
 	var i int64
 	var bytesXferred int64
 
-	d, err := net.Dial(proto, addr+":"+port)
-	if err != nil {
-		log.Fatal(err)
+	for runNumber := 0; runNumber < runs; runNumber++ {
+		bytesXferred = 0
+		d, err := net.Dial(proto, addr+":"+port)
+		if err != nil {
+			log.Fatal(err)
+		}
+		
+		startTime := time.Now()
+		for i = 0; i < blockcount; i++ {
+			newBytes,_ := d.Write(zero)
+			bytesXferred += int64(newBytes)
+		}
+		endTime := time.Now()
+		d.Close()
+		processResult(bytesXferred, endTime.Sub(startTime).Seconds(), showOutput)
 	}
-	defer d.Close()
-	
-	startTime := time.Now()
-	for i = 0; i < blockcount; i++ {
-		newBytes,_ := d.Write(zero)
-		bytesXferred += int64(newBytes)
-	}
-	endTime := time.Now()
-	processResult(bytesXferred, endTime.Sub(startTime).Seconds())
 }
 
+
+// Global variables
 var base float64
 var addr string
 var port string
@@ -133,8 +152,13 @@ var blocksz int64
 var blockcount int64
 var unit string
 var usebytes bool
+var runs int
 
+
+// Initialize the app
 func init() {
+
+	// Define default values and description strings for all flags
 	const (
 		defaultAddress = "localhost"
 		addrDescr = "Interface address (or name) to listen on"
@@ -158,6 +182,8 @@ func init() {
 		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)"
 		defaultBytes = false
 		bytesDescr = "Show results in bytes instead of bits"
+		defaultRuns = 1
+		runsDescr = "How many consecutive times to run the client transfer test (0 is indefinitely)"
 	)
 	flag.StringVar(&addr, "host", defaultAddress, addrDescr)
 	flag.StringVar(&port, "port", defaultPort, portDescr)
@@ -170,20 +196,27 @@ func init() {
 	flag.Float64Var(&base, "base", defaultBase, baseDescr)
 	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
 	flag.BoolVar(&usebytes, "bytes", defaultBytes, bytesDescr)
+	flag.IntVar(&runs, "runs", defaultRuns, runsDescr)
 
+	// Validate flags from CLI
 	flag.Parse()
 }
 
+var wg sync.WaitGroup
+
 func main() {
+	
+	if server && client {
+		go serverHandler(false) // don't log since we're waiting only on the client, so it will log
+		time.Sleep(2*time.Second) // Wait for server to listen before we start client tests
 
-	if server {
-		go serverHandler()
-	} 
-
-	if client {
-		time.Sleep(2000)
-		clientHandler()
-		return
+		wg.Add(1)  // Only wait for client to complete, server will be killed when client runs are complete
+		go clientHandler(true)
+	} else if server {
+		serverHandler(true) // do not background, run indefinitely
+	} else if client {
+		wg.Add(1)
+		go clientHandler(true)  // It doesn't matter if we background or not here, so why not?
 	} 
 
 	if server == false && client == false {
@@ -191,6 +224,5 @@ func main() {
 		return
 	}
 
-	var input string
-    fmt.Scanln(&input)
+	wg.Wait() // Don't exit until all registered jobs are finished
 }
