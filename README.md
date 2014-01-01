@@ -21,7 +21,6 @@ Other options:
 ```
 gonetcat -h
 Usage of gonetcat:
-  -base=1000: Base divisor for doing conversions
   -bcount=1000: Number of blocks to send (default is 1 thousand)
   -bsize=1000000: Block size (in bytes) for client send (default is 1 megabyte)
   -bytes=false: Show results in bytes instead of bits
