@@ -1,57 +1,67 @@
 package main
 
 import (
-	//"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
+	"strings"
 	"time"
 )
 
 type xferResult struct {
-	Bytes int64
+	Bytes float64
 	Seconds float64
 }
 
-func (r *xferResult) Bits() int64 {
-	return r.Bytes*8
+func (r *xferResult) Bits() float64 {
+	return r.Bytes * 8
 }
 
-func (r *xferResult) Bips() float64 {
-	return float64(r.Bits()) / r.Seconds
+func prepUnits() map[string]float64 {
+    var units = make(map[string]float64)
+
+    unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps", "zbps", "ybps"}
+    exponent := -3  // set this to -3 so it is zero for the first run (bps)
+    for i := range unitNames {
+    	exponent += 3 // all powers increase by a factor or 1000 
+		units[unitNames[i]] = math.Pow10(exponent)
+    }
+    return units
 }
 
-func (r *xferResult) KBips() float64 {
-	return float64(r.Bips())/base
+
+func formatValue(rawval float64, format string) float64 {
+    units := prepUnits()
+    return rawval / units[strings.ToLower(format)]
 }
 
-func (r *xferResult) MBips() float64 {
-	return float64(r.KBips())/base
-}
+func processResult(bytes int64, seconds float64) {
+	var result xferResult
+	var rate float64
+	var bitbyte string
+	var totalxferBb int64
 
-func (r *xferResult) GBips() float64 {
-	return float64(r.MBips())/base
-}
+	result.Bytes = float64(bytes)
+	result.Seconds = seconds
 
-func (r *xferResult) Byps() float64 {
-	return float64(r.Bytes)/r.Seconds
-}
+	if usebytes == true {
+		rate = formatValue(result.Bytes/result.Seconds, unit)
+		bitbyte = "bytes"
+		unit = strings.Replace(unit, "b", "B", 1)
+		totalxferBb = int64(result.Bytes)
+	} else {
+		rate = formatValue(result.Bits()/result.Seconds, unit)
+		bitbyte = "bits"
+		totalxferBb = int64(result.Bits())
+	}
 
-func (r *xferResult) KByps() float64 {
-	return float64(r.Byps() / base)
+	unit = strings.Title(unit)
+	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
 }
-
-func (r *xferResult) MByps() float64 {
-	return r.KByps() / base
-}
-
-func (r *xferResult) GByps() float64 {
-	return r.MByps() / base
-}
-
 
 func serverHandler() {
 	// Listen
@@ -72,23 +82,21 @@ func serverHandler() {
 		// The loop then returns to accepting, so that
 		// multiple connections may be served concurrently.
 		go func(c net.Conn) {
-			startTime := time.Now()
-			var result xferResult			
+			var bytesXferred int64	
 
+			startTime := time.Now()
 			if repeat == true {
 				// Echo all incoming data.
-				result.Bytes,_ = io.Copy(c, c)
+				bytesXferred,_ = io.Copy(c, c)
 			} else {
 				// Discard incoming data
-				result.Bytes, _ = io.Copy(ioutil.Discard, c)
+				bytesXferred, _ = io.Copy(ioutil.Discard, c)
 			}
-
-			// Shut down the connection.
 			endTime := time.Now()
+
+			// Shut down the connection
 			c.Close()
-			
-			result.Seconds = endTime.Sub(startTime).Seconds()
-			log.Printf("%f Mb/s (%d bytes received in %f seconds)", result.MBips(), result.Bytes, result.Seconds)
+			processResult(bytesXferred, endTime.Sub(startTime).Seconds())
 		}(conn)
 	}
 }
@@ -96,8 +104,8 @@ func serverHandler() {
 // Generate and send data
 func clientHandler() {
 	zero := make([]byte, blocksz, blocksz)
-	var result xferResult
 	var i int64
+	var bytesXferred int64
 
 	d, err := net.Dial(proto, addr+":"+port)
 	if err != nil {
@@ -108,12 +116,10 @@ func clientHandler() {
 	startTime := time.Now()
 	for i = 0; i < blockcount; i++ {
 		newBytes,_ := d.Write(zero)
-		result.Bytes += int64(newBytes)
+		bytesXferred += int64(newBytes)
 	}
-
 	endTime := time.Now()
-	result.Seconds = endTime.Sub(startTime).Seconds()
-	log.Printf("%f Mb/s (%d bytes sent in %f seconds)", result.MBips(), result.Bytes, result.Seconds)
+	processResult(bytesXferred, endTime.Sub(startTime).Seconds())
 }
 
 var base float64
@@ -125,6 +131,8 @@ var server bool
 var client bool
 var blocksz int64
 var blockcount int64
+var unit string
+var usebytes bool
 
 func init() {
 	const (
@@ -140,12 +148,16 @@ func init() {
 		serverDescr = "Listen for incoming connections"
 		defaultClient = false
 		clientDescr = "Send to remote host"
-		defaultBlockSize = 1
-		blockSizeDescr = "Block size for client send (in bytes)"
-		defaultBlockCount = 1000000
-		blockCountDescr = "Number of blocks to send"
+		defaultBlockSize = 1000000
+		blockSizeDescr = "Block size (in bytes) for client send (default is 1 megabyte)"
+		defaultBlockCount = 1000
+		blockCountDescr = "Number of blocks to send (default is 1 thousand)"
 		defaultBase = 1000
 		baseDescr = "Base divisor for doing conversions"
+		defaultUnit = "bps"
+		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)"
+		defaultBytes = false
+		bytesDescr = "Show results in bytes instead of bits"
 	)
 	flag.StringVar(&addr, "host", defaultAddress, addrDescr)
 	flag.StringVar(&port, "port", defaultPort, portDescr)
@@ -156,6 +168,8 @@ func init() {
 	flag.Int64Var(&blocksz, "bsize", defaultBlockSize, blockSizeDescr)
 	flag.Int64Var(&blockcount, "bcount", defaultBlockCount, blockCountDescr)
 	flag.Float64Var(&base, "base", defaultBase, baseDescr)
+	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
+	flag.BoolVar(&usebytes, "bytes", defaultBytes, bytesDescr)
 
 	flag.Parse()
 }
