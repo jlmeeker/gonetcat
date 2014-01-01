@@ -1,7 +1,7 @@
 gonetcat
 ========
 
-A blend of netcat and dd combined into one executable.
+A blend of netcat and dd combined into one executable. Written in Go (golang).
 
 Bulding:
 ```
