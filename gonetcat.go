@@ -46,7 +46,7 @@ func formatValue(rawval float64, format string) float64 {
 
 
 // Calculate stats and (optionally) print them to the screen
-func processResult(bytes int64, seconds float64, display bool) {
+func processResult(bytes int64, seconds float64) {
 	var result xferResult
 	var rate float64
 	var bitbyte string
@@ -66,10 +66,8 @@ func processResult(bytes int64, seconds float64, display bool) {
 		totalxferBb = int64(result.Bits())
 	}
 
-	if display {
-		unit = strings.Title(unit)
-		log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
-	}
+	unit = strings.Title(unit)
+	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
 }
 
 
@@ -105,9 +103,13 @@ func serverHandler(showOutput bool) {
 			}
 			endTime := time.Now()
 
+			seconds := endTime.Sub(startTime).Seconds()
 			// Shut down the connection
 			c.Close()
-			processResult(bytesXferred, endTime.Sub(startTime).Seconds(), showOutput)
+
+			if showOutput {
+				processResult(bytesXferred, seconds)
+			}
 		}(conn)
 	}
 }
@@ -120,6 +122,8 @@ func clientHandler(showOutput bool) {
 	zero := make([]byte, blocksz, blocksz)
 	var i int64
 	var bytesXferred int64
+	var runsBytesXferred int64
+	var runsSeconds float64
 
 	for runNumber := 0; runNumber < runs; runNumber++ {
 		bytesXferred = 0
@@ -134,8 +138,25 @@ func clientHandler(showOutput bool) {
 			bytesXferred += int64(newBytes)
 		}
 		endTime := time.Now()
+
+		seconds := endTime.Sub(startTime).Seconds()
 		d.Close()
-		processResult(bytesXferred, endTime.Sub(startTime).Seconds(), showOutput)
+		
+		// Crunch numbers and display output (if enabled)
+		if showOutput {
+			processResult(bytesXferred, seconds)
+		}
+		
+		// Keep track of stats over all runs
+		runsBytesXferred += bytesXferred
+		runsSeconds += seconds
+	}
+
+	if runs > 1 && showOutput {
+		log.Println("Average over all runs:")
+		avgBytesPerRun := runsBytesXferred/int64(runs)
+		avgSeconds := runsSeconds/float64(runs)
+		processResult(avgBytesPerRun, avgSeconds)
 	}
 }
 
