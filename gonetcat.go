@@ -31,7 +31,7 @@ func prepUnits() map[string]float64 {
     unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps", "zbps", "ybps"}
     exponent := -3  // set this to -3 so it is zero for the first run (bps)
     for i := range unitNames {
-    	exponent += 3 // all powers increase by a factor or 1000 
+    	exponent += 3 // all powers increase by a factor of 1000 
 		units[unitNames[i]] = math.Pow10(exponent)
     }
     return units
@@ -141,7 +141,6 @@ func clientHandler(showOutput bool) {
 
 
 // Global variables
-var base float64
 var addr string
 var port string
 var proto string
@@ -176,8 +175,6 @@ func init() {
 		blockSizeDescr = "Block size (in bytes) for client send (default is 1 megabyte)"
 		defaultBlockCount = 1000
 		blockCountDescr = "Number of blocks to send (default is 1 thousand)"
-		defaultBase = 1000
-		baseDescr = "Base divisor for doing conversions"
 		defaultUnit = "bps"
 		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)"
 		defaultBytes = false
@@ -193,7 +190,6 @@ func init() {
 	flag.BoolVar(&client, "client", defaultClient, clientDescr)
 	flag.Int64Var(&blocksz, "bsize", defaultBlockSize, blockSizeDescr)
 	flag.Int64Var(&blockcount, "bcount", defaultBlockCount, blockCountDescr)
-	flag.Float64Var(&base, "base", defaultBase, baseDescr)
 	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
 	flag.BoolVar(&usebytes, "bytes", defaultBytes, bytesDescr)
 	flag.IntVar(&runs, "runs", defaultRuns, runsDescr)
