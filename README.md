@@ -23,11 +23,11 @@ user@hostname $ gonetcat -h
 Usage of gonetcat:
   -B=false: Show results in bytes instead of bits
   -U=false: Use UDP instead of TCP
-  -bc=1000: Number of blocks to send (default is 1 thousand)
-  -bs=1000000: Block size (in bytes) for client send (default is 1 megabyte)
+  -bc="1000": Number of blocks to send (default is 1 thousand) optional suffixes are: k, m, g, t, p, e
+  -bs="1000000": Block size (in bytes) for client send (default is 1 megabyte) optional suffixes are: k, m, g, t, p, e
   -c=1: How many consecutive times to run the client transfer test (0 is indefinitely)
   -client=false: Send to remote host
-  -d="": Amount of data to send (in bytes) optional suffixes are: k, m, g, t, p, e
+  -d="": Overrides -bc. Total data size to send (in bytes) optional suffixes are: k, m, g, t, p, e
   -l=false: Listen for incoming connections
   -p="2000": Port to listen on
   -repeat=false: Enable echo of received data (reply to sender with received data)
@@ -55,4 +55,7 @@ user@hostname $ gonetcat -client -bs 10000 -bc 100000 -B -unit gbps -c 5
 
 user@hostname $ gonetcat -client -d 200g -B -unit mbps
 2014/01/01 20:45:21 3204.516948 MBps (200000000000 bytes sent in 62.411903 seconds)
+
+user@hostname $ gonetcat -client -bs 3m -bc 2k -unit mbps
+2014/01/01 22:04:12 25601.544586 Mbps (48000000000 bits sent in 1.874887 seconds)
 ```

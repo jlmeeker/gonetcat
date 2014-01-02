@@ -153,7 +153,7 @@ func serverHandler(proto string, showOutput bool) {
 func clientHandler(proto string, showOutput bool) {
 	defer wg.Done()
 
-	zero := make([]byte, blocksz, blocksz)
+	zero := make([]byte, blockszInt, blockszInt)
 	var i int64
 	var bytesXferred int64
 	var runsBytesXferred int64
@@ -177,7 +177,7 @@ func clientHandler(proto string, showOutput bool) {
 		}
 		
 		startTime := time.Now()
-		for i = 0; i < blockcount; i++ {
+		for i = 0; i < blockcountInt; i++ {
 			if stopExecution {
 				break
 			}
@@ -220,12 +220,15 @@ var udp bool
 var repeat bool
 var server bool
 var client bool
-var blocksz int64
-var blockcount int64
+var blocksz string
+var blockcount string
 var unit string
 var usebytes bool
 var runs int
 var dataSize string
+
+var blockszInt int64
+var blockcountInt int64
 
 
 // Initialize the app
@@ -245,10 +248,10 @@ func init() {
 		listenDescr = "Listen for incoming connections"
 		defaultClient = false
 		clientDescr = "Send to remote host"
-		defaultBlockSize = 1000000
-		blockSizeDescr = "Block size (in bytes) for client send (default is 1 megabyte)"
-		defaultBlockCount = 1000
-		blockCountDescr = "Number of blocks to send (default is 1 thousand)"
+		defaultBlockSize = "1000000"
+		blockSizeDescr = "Block size (in bytes) for client send (default is 1 megabyte) optional suffixes are: k, m, g, t, p, e"
+		defaultBlockCount = "1000"
+		blockCountDescr = "Number of blocks to send (default is 1 thousand) optional suffixes are: k, m, g, t, p, e"
 		defaultUnit = "bps"
 		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)"
 		defaultBytes = false
@@ -264,8 +267,8 @@ func init() {
 	flag.BoolVar(&repeat, "repeat", defaultRepeat, repeatDescr)
 	flag.BoolVar(&server, "l", defaultListen, listenDescr)
 	flag.BoolVar(&client, "client", defaultClient, clientDescr)
-	flag.Int64Var(&blocksz, "bs", defaultBlockSize, blockSizeDescr)
-	flag.Int64Var(&blockcount, "bc", defaultBlockCount, blockCountDescr)
+	flag.StringVar(&blocksz, "bs", defaultBlockSize, blockSizeDescr)
+	flag.StringVar(&blockcount, "bc", defaultBlockCount, blockCountDescr)
 	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
 	flag.BoolVar(&usebytes, "B", defaultBytes, bytesDescr)
 	flag.IntVar(&runs, "c", defaultRuns, runsDescr)
@@ -286,15 +289,18 @@ func main() {
 		proto = "udp"
 	}
 
+	blockszInt = int64(parseDataSize(blocksz))
+	blockcountInt = int64(parseDataSize(blockcount))
+
 	// Adjust block count if dataSize was set
 	parsedDataSize := parseDataSize(dataSize)
 	if dataSize != "" && parsedDataSize != int64(0) {
-		if (parsedDataSize > blocksz) {
-			blockcount = parsedDataSize/blocksz
+		if (parsedDataSize > blockszInt) {
+			blockcountInt = parsedDataSize/blockszInt
 		} else {
 			log.Println("Specified data size is smaller than block size, reducing block size.")
-			blocksz = parsedDataSize
-			blockcount = parsedDataSize/blocksz
+			blockszInt = parsedDataSize
+			blockcountInt = parsedDataSize/blockszInt
 		}
 		
 	} else if dataSize != "" && parsedDataSize == int64(0) {
