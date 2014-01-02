@@ -17,10 +17,12 @@ import (
 	"time"
 )
 
+
 type xferResult struct {
 	Bytes float64
 	Seconds float64
 }
+
 
 // Get our result bytes into bits
 func (r *xferResult) Bits() float64 {
@@ -105,8 +107,9 @@ func parseDataSize(incoming string) (size int64) {
 	return
 }
 
+
 // Run as a server
-func serverHandler(proto string, showOutput bool) {
+func serverHandler(showOutput bool) {
 	// Listen
 	l, err := net.Listen(proto, addr+":"+port)
 
@@ -150,7 +153,7 @@ func serverHandler(proto string, showOutput bool) {
 
 
 // Run as a client
-func clientHandler(proto string, showOutput bool) {
+func clientHandler(showOutput bool) {
 	defer wg.Done()
 
 	zero := make([]byte, blockszInt, blockszInt)
@@ -213,7 +216,8 @@ func clientHandler(proto string, showOutput bool) {
 
 
 // Global variables
-var stopExecution bool
+var wg sync.WaitGroup
+var stopExecution bool = false
 var addr string
 var port string
 var udp bool
@@ -226,14 +230,13 @@ var unit string
 var usebytes bool
 var runs int
 var dataSize string
-
 var blockszInt int64
 var blockcountInt int64
+var proto string = "tcp"
 
 
 // Initialize the app
 func init() {
-
 	// Define default values and description strings for all flags
 	const (
 		defaultAddress = "localhost"
@@ -277,18 +280,7 @@ func init() {
 	// Validate flags from CLI
 	flag.Parse()
 
-	// Let things run
-	stopExecution = false
-}
-
-var wg sync.WaitGroup
-
-func main() {
-	proto := "tcp"
-	if udp {
-		proto = "udp"
-	}
-
+	// Extra processing of flag data
 	blockszInt = int64(parseDataSize(blocksz))
 	blockcountInt = int64(parseDataSize(blockcount))
 
@@ -307,6 +299,18 @@ func main() {
 		log.Println("Error parsing -d value, using -bc value instead.")
 	}
 
+	// Set string for specified (or not) protocol
+	if udp {
+		proto = "udp"
+	}
+
+	// Let things run
+	stopExecution = false
+}
+
+
+
+func main() {
 	// Catch Ctrl-C so we can exit cleanly
 	c := make(chan os.Signal, 1)                                       
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)                                     
@@ -321,16 +325,16 @@ func main() {
 	
 	// Run server and/or client
 	if server && client {
-		go serverHandler(proto, false) // don't log since we're waiting only on the client, so it will log
+		go serverHandler(false) // don't log since we're waiting only on the client, so it will log
 		time.Sleep(2*time.Second) // Wait for server to listen before we start client tests
 
 		wg.Add(1)  // Only wait for client to complete, server will be killed when client runs are complete
-		go clientHandler(proto, true)
+		go clientHandler(true)
 	} else if server {
-		serverHandler(proto, true) // do not background, run indefinitely
+		serverHandler(true) // do not background, run indefinitely
 	} else if client {
 		wg.Add(1)
-		go clientHandler(proto, true)  // It doesn't matter if we background or not here, so why not?
+		go clientHandler(true)  // It doesn't matter if we background or not here, so why not?
 	} 
 
 	if server == false && client == false {
