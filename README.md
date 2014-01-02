@@ -27,11 +27,12 @@ Usage of gonetcat:
   -bs=1000000: Block size (in bytes) for client send (default is 1 megabyte)
   -c=1: How many consecutive times to run the client transfer test (0 is indefinitely)
   -client=false: Send to remote host
+  -d="": Amount of data to send (in bytes) optional suffixes are: k, m, g, t, p, e
   -l=false: Listen for incoming connections
   -p="2000": Port to listen on
   -repeat=false: Enable echo of received data (reply to sender with received data)
   -s="localhost": Interface address (or name) to listen on
-  -unit="bps": Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)
+  -unit="bps": Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)
 ```
 
 Sample output:

@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -31,7 +32,7 @@ func (r *xferResult) Bits() float64 {
 func prepUnits() map[string]float64 {
     var units = make(map[string]float64)
 
-    unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps", "zbps", "ybps"}
+    unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps"}
     exponent := -3  // set this to -3 so it is zero for the first run (bps)
     for i := range unitNames {
     	exponent += 3 // all powers increase by a factor of 1000 
@@ -42,9 +43,16 @@ func prepUnits() map[string]float64 {
 
 
 // Get our rate in the specified unit
-func formatValue(rawval float64, format string) float64 {
+func formatValue(method string, rawval float64, format string) (value float64) {
     units := prepUnits()
-    return rawval / units[strings.ToLower(format)]
+
+    if method == "reduce" {
+    	value = rawval / units[strings.ToLower(format)]
+    } else {
+    	value = rawval * units[strings.ToLower(format)]
+    }
+
+    return 
 }
 
 
@@ -59,12 +67,12 @@ func processResult(bytes int64, seconds float64) {
 	result.Seconds = seconds
 
 	if usebytes == true {
-		rate = formatValue(result.Bytes/result.Seconds, unit)
+		rate = formatValue("reduce", result.Bytes/result.Seconds, unit)
 		bitbyte = "bytes"
 		unit = strings.Replace(unit, "b", "B", 1)
 		totalxferBb = int64(result.Bytes)
 	} else {
-		rate = formatValue(result.Bits()/result.Seconds, unit)
+		rate = formatValue("reduce", result.Bits()/result.Seconds, unit)
 		bitbyte = "bits"
 		totalxferBb = int64(result.Bits())
 	}
@@ -73,6 +81,29 @@ func processResult(bytes int64, seconds float64) {
 	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
 }
 
+
+// Convert string value into usable integer
+func parseDataSize(incoming string) (size int64) {
+	incomingBytes := []byte(incoming)
+
+	if incoming == "" {
+		return
+	}
+
+	sizeStr := string(incomingBytes[0:len(incomingBytes)-1])
+	suffix := string(incomingBytes[len(incomingBytes)-1])
+
+	if strings.Contains("kmgtpe", suffix) {
+		suffix = suffix+"bps"  // lazy re-use of formatValue function
+	} else {
+		sizeStr = sizeStr + suffix
+		suffix = "bps"
+	}
+
+	size,_ = strconv.ParseInt(sizeStr,0,0)
+	size = int64(formatValue("increase", float64(size), suffix))
+	return
+}
 
 // Run as a server
 func serverHandler(proto string, showOutput bool) {
@@ -194,6 +225,7 @@ var blockcount int64
 var unit string
 var usebytes bool
 var runs int
+var dataSize string
 
 
 // Initialize the app
@@ -218,11 +250,13 @@ func init() {
 		defaultBlockCount = 1000
 		blockCountDescr = "Number of blocks to send (default is 1 thousand)"
 		defaultUnit = "bps"
-		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps, zbps, ybps)"
+		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)"
 		defaultBytes = false
 		bytesDescr = "Show results in bytes instead of bits"
 		defaultRuns = 1
 		runsDescr = "How many consecutive times to run the client transfer test (0 is indefinitely)"
+		defaultDataSize = ""
+		dataSizeDescr = "Overrides -bc. Total data size to send (in bytes) optional suffixes are: k, m, g, t, p, e"
 	)
 	flag.StringVar(&addr, "s", defaultAddress, addrDescr)
 	flag.StringVar(&port, "p", defaultPort, portDescr)
@@ -235,6 +269,7 @@ func init() {
 	flag.StringVar(&unit, "unit", defaultUnit, unitDescr)
 	flag.BoolVar(&usebytes, "B", defaultBytes, bytesDescr)
 	flag.IntVar(&runs, "c", defaultRuns, runsDescr)
+	flag.StringVar(&dataSize, "d", defaultDataSize, dataSizeDescr)
 
 	// Validate flags from CLI
 	flag.Parse()
@@ -249,6 +284,21 @@ func main() {
 	proto := "tcp"
 	if udp {
 		proto = "udp"
+	}
+
+	// Adjust block count if dataSize was set
+	parsedDataSize := parseDataSize(dataSize)
+	if dataSize != "" && parsedDataSize != int64(0) {
+		if (parsedDataSize > blocksz) {
+			blockcount = parsedDataSize/blocksz
+		} else {
+			log.Println("Specified data size is smaller than block size, reducing block size.")
+			blocksz = parsedDataSize
+			blockcount = parsedDataSize/blocksz
+		}
+		
+	} else if dataSize != "" && parsedDataSize == int64(0) {
+		log.Println("Error parsing -d value, using -bc value instead.")
 	}
 
 	// Catch Ctrl-C so we can exit cleanly
