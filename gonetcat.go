@@ -10,53 +10,48 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"syscall"
-	"strings"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
-
 type xferResult struct {
-	Bytes float64
+	Bytes   float64
 	Seconds float64
 }
-
 
 // Get our result bytes into bits
 func (r *xferResult) Bits() float64 {
 	return r.Bytes * 8
 }
 
-
 // Build units array (used in formatValue for division operations)
 func prepUnits() map[string]float64 {
-    var units = make(map[string]float64)
+	var units = make(map[string]float64)
 
-    unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps"}
-    exponent := -3  // set this to -3 so it is zero for the first run (bps)
-    for i := range unitNames {
-    	exponent += 3 // all powers increase by a factor of 1000 
+	unitNames := [...]string{"bps", "kbps", "mbps", "gbps", "tbps", "pbps", "ebps"}
+	exponent := -3 // set this to -3 so it is zero for the first run (bps)
+	for i := range unitNames {
+		exponent += 3 // all powers increase by a factor of 1000
 		units[unitNames[i]] = math.Pow10(exponent)
-    }
-    return units
+	}
+	return units
 }
-
 
 // Get our rate in the specified unit
 func formatValue(method string, rawval float64, format string) (value float64) {
-    units := prepUnits()
+	units := prepUnits()
 
-    if method == "reduce" {
-    	value = rawval / units[strings.ToLower(format)]
-    } else {
-    	value = rawval * units[strings.ToLower(format)]
-    }
+	if method == "reduce" {
+		value = rawval / units[strings.ToLower(format)]
+	} else {
+		value = rawval * units[strings.ToLower(format)]
+	}
 
-    return 
+	return
 }
-
 
 // Calculate stats and (optionally) print them to the screen
 func processResult(bytes int64, seconds float64) {
@@ -83,7 +78,6 @@ func processResult(bytes int64, seconds float64) {
 	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
 }
 
-
 // Convert string value into usable integer
 func parseDataSize(incoming string) (size int64) {
 	incomingBytes := []byte(incoming)
@@ -92,21 +86,20 @@ func parseDataSize(incoming string) (size int64) {
 		return
 	}
 
-	sizeStr := string(incomingBytes[0:len(incomingBytes)-1])
+	sizeStr := string(incomingBytes[0 : len(incomingBytes)-1])
 	suffix := string(incomingBytes[len(incomingBytes)-1])
 
 	if strings.Contains("kmgtpe", suffix) {
-		suffix = suffix+"bps"  // lazy re-use of formatValue function
+		suffix = suffix + "bps" // lazy re-use of formatValue function
 	} else {
 		sizeStr = sizeStr + suffix
 		suffix = "bps"
 	}
 
-	size,_ = strconv.ParseInt(sizeStr,0,0)
+	size, _ = strconv.ParseInt(sizeStr, 0, 0)
 	size = int64(formatValue("increase", float64(size), suffix))
 	return
 }
-
 
 // Run as a server
 func serverHandler(showOutput bool) {
@@ -128,12 +121,12 @@ func serverHandler(showOutput bool) {
 		// The loop then returns to accepting, so that
 		// multiple connections may be served concurrently.
 		go func(c net.Conn) {
-			var bytesXferred int64	
+			var bytesXferred int64
 
 			startTime := time.Now()
 			if repeat == true {
 				// Echo all incoming data.
-				bytesXferred,_ = io.Copy(c, c)
+				bytesXferred, _ = io.Copy(c, c)
 			} else {
 				// Discard incoming data
 				bytesXferred, _ = io.Copy(ioutil.Discard, c)
@@ -150,7 +143,6 @@ func serverHandler(showOutput bool) {
 		}(conn)
 	}
 }
-
 
 // Run as a client
 func clientHandler(showOutput bool) {
@@ -178,25 +170,25 @@ func clientHandler(showOutput bool) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		
+
 		startTime := time.Now()
 		for i = 0; i < blockcountInt; i++ {
 			if stopExecution {
 				break
 			}
-			newBytes,_ := d.Write(zero)
+			newBytes, _ := d.Write(zero)
 			bytesXferred += int64(newBytes)
 		}
 		endTime := time.Now()
 
 		seconds := endTime.Sub(startTime).Seconds()
 		d.Close()
-		
+
 		// Crunch numbers and display output (if enabled)
 		if showOutput {
 			processResult(bytesXferred, seconds)
 		}
-		
+
 		// Keep track of stats over all runs
 		runsBytesXferred += bytesXferred
 		runsSeconds += seconds
@@ -208,12 +200,11 @@ func clientHandler(showOutput bool) {
 
 	if runs > 1 && showOutput {
 		log.Println("Average over all runs:")
-		avgBytesPerRun := runsBytesXferred/int64(runs)
-		avgSeconds := runsSeconds/float64(runs)
+		avgBytesPerRun := runsBytesXferred / int64(runs)
+		avgSeconds := runsSeconds / float64(runs)
 		processResult(avgBytesPerRun, avgSeconds)
 	}
 }
-
 
 // Global variables
 var wg sync.WaitGroup
@@ -234,35 +225,34 @@ var blockszInt int64
 var blockcountInt int64
 var proto string = "tcp"
 
-
 // Initialize the app
 func init() {
 	// Define default values and description strings for all flags
 	const (
-		defaultAddress = "localhost"
-		addrDescr = "Interface address (or name) to listen on"
-		defaultPort = "2000"
-		portDescr = "Port to listen on"
-		defaultUdp = false
-		udpDescr = "Use UDP instead of TCP"
-		defaultRepeat = false
-		repeatDescr = "Enable echo of received data (reply to sender with received data)"
-		defaultListen = false
-		listenDescr = "Listen for incoming connections"
-		defaultClient = false
-		clientDescr = "Send to remote host"
-		defaultBlockSize = "1000000"
-		blockSizeDescr = "Block size (in bytes) for client send (default is 1 megabyte) optional suffixes are: k, m, g, t, p, e"
+		defaultAddress    = "localhost"
+		addrDescr         = "Interface address (or name) to listen on"
+		defaultPort       = "2000"
+		portDescr         = "Port to listen on"
+		defaultUdp        = false
+		udpDescr          = "Use UDP instead of TCP"
+		defaultRepeat     = false
+		repeatDescr       = "Enable echo of received data (reply to sender with received data)"
+		defaultListen     = false
+		listenDescr       = "Listen for incoming connections"
+		defaultClient     = false
+		clientDescr       = "Send to remote host"
+		defaultBlockSize  = "1000000"
+		blockSizeDescr    = "Block size (in bytes) for client send (default is 1 megabyte) optional suffixes are: k, m, g, t, p, e"
 		defaultBlockCount = "1000"
-		blockCountDescr = "Number of blocks to send (default is 1 thousand) optional suffixes are: k, m, g, t, p, e"
-		defaultUnit = "bps"
-		unitDescr = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)"
-		defaultBytes = false
-		bytesDescr = "Show results in bytes instead of bits"
-		defaultRuns = 1
-		runsDescr = "How many consecutive times to run the client transfer test (0 is indefinitely)"
-		defaultDataSize = ""
-		dataSizeDescr = "Overrides -bc. Total data size to send (in bytes) optional suffixes are: k, m, g, t, p, e"
+		blockCountDescr   = "Number of blocks to send (default is 1 thousand) optional suffixes are: k, m, g, t, p, e"
+		defaultUnit       = "bps"
+		unitDescr         = "Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)"
+		defaultBytes      = false
+		bytesDescr        = "Show results in bytes instead of bits"
+		defaultRuns       = 1
+		runsDescr         = "How many consecutive times to run the client transfer test (0 is indefinitely)"
+		defaultDataSize   = ""
+		dataSizeDescr     = "Overrides -bc. Total data size to send (in bytes) optional suffixes are: k, m, g, t, p, e"
 	)
 	flag.StringVar(&addr, "s", defaultAddress, addrDescr)
 	flag.StringVar(&port, "p", defaultPort, portDescr)
@@ -287,14 +277,14 @@ func init() {
 	// Adjust block count if dataSize was set
 	parsedDataSize := parseDataSize(dataSize)
 	if dataSize != "" && parsedDataSize != int64(0) {
-		if (parsedDataSize > blockszInt) {
-			blockcountInt = parsedDataSize/blockszInt
+		if parsedDataSize > blockszInt {
+			blockcountInt = parsedDataSize / blockszInt
 		} else {
 			log.Println("Specified data size is smaller than block size, reducing block size.")
 			blockszInt = parsedDataSize
-			blockcountInt = parsedDataSize/blockszInt
+			blockcountInt = parsedDataSize / blockszInt
 		}
-		
+
 	} else if dataSize != "" && parsedDataSize == int64(0) {
 		log.Println("Error parsing -d value, using -bc value instead.")
 	}
@@ -308,34 +298,32 @@ func init() {
 	stopExecution = false
 }
 
-
-
 func main() {
 	// Catch Ctrl-C so we can exit cleanly
-	c := make(chan os.Signal, 1)                                       
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)                                     
-	go func() {                                                        
-		for _ = range c {                                             
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for _ = range c {
 			stopExecution = true
 			if client == false {
 				os.Exit(1)
 			}
-		}                                                            
+		}
 	}()
-	
+
 	// Run server and/or client
 	if server && client {
-		go serverHandler(false) // don't log since we're waiting only on the client, so it will log
-		time.Sleep(2*time.Second) // Wait for server to listen before we start client tests
+		go serverHandler(false)     // don't log since we're waiting only on the client, so it will log
+		time.Sleep(2 * time.Second) // Wait for server to listen before we start client tests
 
-		wg.Add(1)  // Only wait for client to complete, server will be killed when client runs are complete
+		wg.Add(1) // Only wait for client to complete, server will be killed when client runs are complete
 		go clientHandler(true)
 	} else if server {
 		serverHandler(true) // do not background, run indefinitely
 	} else if client {
 		wg.Add(1)
-		go clientHandler(true)  // It doesn't matter if we background or not here, so why not?
-	} 
+		go clientHandler(true) // It doesn't matter if we background or not here, so why not?
+	}
 
 	if server == false && client == false {
 		fmt.Println("You must specify at least one of -l, -client.")
