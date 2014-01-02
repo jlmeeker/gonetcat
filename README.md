@@ -52,4 +52,7 @@ user@hostname $ gonetcat -client -bs 10000 -bc 100000 -B -unit gbps -c 5
 2014/01/01 10:20:11 1.537356 GBps (1000000000 bytes sent in 0.650467 seconds)
 2014/01/01 10:20:11 Average over all runs:
 2014/01/01 10:20:11 1.525233 GBps (1000000000 bytes sent in 0.655638 seconds)
+
+user@hostname $ gonetcat -client -d 200g -B -unit mbps
+2014/01/01 20:45:21 3204.516948 MBps (200000000000 bytes sent in 62.411903 seconds)
 ```
