@@ -31,7 +31,7 @@ Usage of gonetcat:
   -l=false: Listen for incoming connections
   -p="2000": Port to listen on
   -repeat=false: Enable echo of received data (reply to sender with received data)
-  -s="localhost": Interface address (or name) to listen on
+  -s="0.0.0.0": Interface address (or name) to listen on
   -unit="bps": Desired units in which to display results (bps, kbps, mbps, gbps, tbps, pbps, ebps)
 ```
 
