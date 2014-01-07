@@ -39,7 +39,7 @@ Sample output:
 ```Bash
 # run as a server and client on the same computer (testing a combination of cpu/memory speeds)
 user@hostname $ gonetcat -l -client -bs 100000000 -bc 100
-2013/12/31 20:26:20 23057959355.344212 Bps (80000000000 bits sent in 3.469518 seconds)
+2013/12/31 20:26:20 23057959355.344212 bps (80000000000 bits sent in 3.469518 seconds)
 
 user@hostname $ gonetcat -l -client -bs 100000000 -bc 100 -unit mbps
 2013/12/31 20:26:53 23507.409472 Mbps (80000000000 bits sent in 3.403182 seconds)
