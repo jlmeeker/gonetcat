@@ -74,7 +74,9 @@ func processResult(bytes int64, seconds float64) {
 		totalxferBb = int64(result.Bits())
 	}
 
-	unit = strings.Title(unit)
+	if len(unit) > 3 {
+		unit = strings.Title(unit)
+	}
 	log.Printf("%f %s (%d %s sent in %f seconds)", rate, unit, totalxferBb, bitbyte, result.Seconds)
 }
 
