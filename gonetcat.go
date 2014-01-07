@@ -231,7 +231,7 @@ var proto string = "tcp"
 func init() {
 	// Define default values and description strings for all flags
 	const (
-		defaultAddress    = "localhost"
+		defaultAddress    = "0.0.0.0"
 		addrDescr         = "Interface address (or name) to listen on"
 		defaultPort       = "2000"
 		portDescr         = "Port to listen on"
