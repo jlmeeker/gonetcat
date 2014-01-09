@@ -22,7 +22,6 @@ Other options:
 user@hostname $ gonetcat -h
 Usage of gonetcat:
   -B=false: Show results in bytes instead of bits
-  -U=false: Use UDP instead of TCP
   -bc="1000": Number of blocks to send (default is 1 thousand) optional suffixes are: k, m, g, t, p, e
   -bs="1000000": Block size (in bytes) for client send (default is 1 megabyte) optional suffixes are: k, m, g, t, p, e
   -c=1: How many consecutive times to run the client transfer test (0 is indefinitely)

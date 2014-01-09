@@ -235,8 +235,8 @@ func init() {
 		addrDescr         = "Interface address (or name) to listen on"
 		defaultPort       = "2000"
 		portDescr         = "Port to listen on"
-		defaultUdp        = false
-		udpDescr          = "Use UDP instead of TCP"
+		//defaultUdp        = false
+		//udpDescr          = "Use UDP instead of TCP"
 		defaultRepeat     = false
 		repeatDescr       = "Enable echo of received data (reply to sender with received data)"
 		defaultListen     = false
@@ -258,7 +258,7 @@ func init() {
 	)
 	flag.StringVar(&addr, "s", defaultAddress, addrDescr)
 	flag.StringVar(&port, "p", defaultPort, portDescr)
-	flag.BoolVar(&udp, "U", defaultUdp, udpDescr)
+	//flag.BoolVar(&udp, "U", defaultUdp, udpDescr)
 	flag.BoolVar(&repeat, "repeat", defaultRepeat, repeatDescr)
 	flag.BoolVar(&server, "l", defaultListen, listenDescr)
 	flag.BoolVar(&client, "client", defaultClient, clientDescr)
@@ -292,9 +292,9 @@ func init() {
 	}
 
 	// Set string for specified (or not) protocol
-	if udp {
-		proto = "udp"
-	}
+	//if udp {
+	//	proto = "udp"
+	//}
 
 	// Let things run
 	stopExecution = false
